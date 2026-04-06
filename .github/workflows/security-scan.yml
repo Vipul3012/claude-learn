@@ -1,0 +1,53 @@
+name: 🔒 AI Security Scan
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 9 * * 1'  # Every Monday 9 AM UTC
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    name: Claude AI Security Scan
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 📦 Install Dependencies
+        run: pip install -r requirements.txt
+
+      - name: 🔒 Run Security Scan
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          cd src
+          python security_scanner.py .. --save
+
+      - name: 📊 Upload Security Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-report-${{ github.run_number }}
+          path: reports/
+          retention-days: 30
+
+      - name: ✅ Check for Critical Issues
+        run: |
+          if ls reports/security_report_*.md 2>/dev/null; then
+            echo "📋 Security report generated successfully"
+            if grep -q "Critical Vulnerabilities" reports/security_report_*.md; then
+              echo "⚠️ Critical vulnerabilities found - check the report!"
+            else
+              echo "✅ No critical vulnerabilities detected"
+            fi
+          fi
